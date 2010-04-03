@@ -96,7 +96,7 @@ def data_to_event(data):
     event.add('dtstart', d)
     event.add('dtend', d)
     event.add('dtstamp', d)
-    event["uid"] = "%s-%s%s@launches.ksc.nasa.gov" % (data.get("Mission", "MISSION"), d.year, d.month)
+    event["uid"] = "%s-%s%s@launches.ksc.nasa.gov" % (data.get("Mission", "MISSION").replace(" ", "-").lower(), d.year, d.month)
     return event
     
 
@@ -108,7 +108,6 @@ class EventsListingCal(webapp.RequestHandler):
 
     def get(self):
         self.response.headers['Content-Type'] = 'text/calendar'
-        self.response.headers['Content-Type'] = 'text/plain'
 
         calendar = memcache.get("ksc-calendar")
         if calendar:
@@ -116,6 +115,8 @@ class EventsListingCal(webapp.RequestHandler):
             
 
         cal = Calendar()
+        cal.add('prodid', '-//Kennedy Space Center launches//web.chad.org//')
+        cal.add('version', '0.1')
         nasa_html = urllib.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
         doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
 
