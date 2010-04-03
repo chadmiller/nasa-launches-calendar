@@ -167,6 +167,13 @@ class EventsListingCal(webapp.RequestHandler):
 application = webapp.WSGIApplication(
         [
             ('/', EventsListingCal),
+            ('/1', EventsListingCal),
+            ('/2', EventsListingCal),
+            ('/3', EventsListingCal),
+            ('/4', EventsListingCal),
+            ('/5', EventsListingCal),
+            ('/6', EventsListingCal),
+            ('/7', EventsListingCal),
             ('/statistics', Statistics),
             ('/about', About)
         ], debug=True)
