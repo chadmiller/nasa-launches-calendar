@@ -91,12 +91,12 @@ def data_to_event(data):
     description_key = [dk for dk in data.keys() if dk.endswith("Description")][0]
 
     event = Event()
-    event.add('dtsummary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
+    event.add('summary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
     event.add('description', data.get(description_key))
     event.add('dtstart', d)
     event.add('dtend', d)
     event.add('dtstamp', d)
-    event["uid"] = "%s-%s%s@launches.ksc.nasa.gov" % (data.get("Mission", "MISSION").replace(" ", "-").lower(), d.year, d.month)
+    event["uid"] = "%s@launches.ksc.nasa.gov" % (data.get("Mission", "MISSION").replace(" ", "-").lower(),)
     return event
     
 
@@ -115,8 +115,10 @@ class EventsListingCal(webapp.RequestHandler):
             
 
         cal = Calendar()
-        cal.add('prodid', '-//Kennedy Space Center launches//web.chad.org//')
-        cal.add('version', '0.1')
+        cal.add('prodid', '-//Kennedy Space Center launches by Chad//NONSCML//EN')
+        cal.add('version', '2.0')
+        cal.add('X-WR-CALNAME', 'KSC launches by Chad')
+        cal.add('X-WR-TIMEZONE', 'US/Eastern')
         nasa_html = urllib.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
         doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
 
