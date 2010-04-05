@@ -77,7 +77,7 @@ def interpret_date(data):
 
 def data_to_event(data):
     if "Date" not in data:
-        logging.warn("no date in %r" % (data,))
+        logging.info("no date in %r" % (data,))
         return
 
     try:
@@ -93,9 +93,16 @@ def data_to_event(data):
     event = Event()
     event.add('summary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
     event.add('description', data.get(description_key))
-    event.add('dtstart', d)
-    event.add('dtend', d)
-    event.add('dtstamp', d)
+    event.add('dtstamp', datetime.now())  # todo: make this the modtime of page
+    if type(d) == datetime:
+        event.add('dtstart', d)
+    else:
+        event.add('dtstart;value=date', icalendar.vDate(d).ical())
+
+    if type(d) == datetime:
+        event.add('dtend', d + timedelta(minutes=10))
+    else:
+        event.add('dtend;value=date', icalendar.vDate(d).ical())
     event["uid"] = "%s@launches.ksc.nasa.gov" % (data.get("Mission", "MISSION").replace(" ", "-").lower(),)
     return event
     
@@ -109,15 +116,17 @@ class EventsListingCal(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/calendar'
 
-        calendar = memcache.get("ksc-calendar")
-        if calendar:
-            self.response.out.write(calendar)
-            
+#        calendar = memcache.get("ksc-calendar")
+#        if calendar:
+#            self.response.out.write(calendar)
+#            return
 
         cal = Calendar()
-        cal.add('prodid', '-//Kennedy Space Center launches by Chad//NONSCML//EN')
         cal.add('version', '2.0')
+        cal.add('prodid', '-//Kennedy Space Center launches by Chad//NONSCML//EN')
+        cal.add('X-WR-CALID', '8293bcab-1b27-44dd-8a3c-2bb045888629')
         cal.add('X-WR-CALNAME', 'KSC launches by Chad')
+        cal.add('X-WR-CALDESC', "NASA publishes a web page of scheduled launches, but an iCalendar/RFC5545 feed would be so much better and useful.  So, ( http://web.chad.org/ ) Chad made one.  Enjoy!")
         cal.add('X-WR-TIMEZONE', 'US/Eastern')
         nasa_html = urllib.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
         doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
@@ -166,7 +175,9 @@ class EventsListingCal(webapp.RequestHandler):
 
 application = webapp.WSGIApplication(
         [
+            ('/ksc-launches.ics', EventsListingCal),
             ('/', EventsListingCal),
+            ('/0', EventsListingCal),
             ('/1', EventsListingCal),
             ('/2', EventsListingCal),
             ('/3', EventsListingCal),
@@ -174,6 +185,8 @@ application = webapp.WSGIApplication(
             ('/5', EventsListingCal),
             ('/6', EventsListingCal),
             ('/7', EventsListingCal),
+            ('/8', EventsListingCal),
+            ('/9', EventsListingCal),
             ('/statistics', Statistics),
             ('/about', About)
         ], debug=True)
