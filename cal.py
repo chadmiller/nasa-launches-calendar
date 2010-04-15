@@ -116,10 +116,10 @@ class EventsListingCal(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/calendar'
 
-#        calendar = memcache.get("ksc-calendar")
-#        if calendar:
-#            self.response.out.write(calendar)
-#            return
+        calendar = memcache.get("ksc-calendar")
+        if calendar:
+            self.response.out.write(calendar)
+            return
 
         cal = Calendar()
         cal.add('version', '2.0')
@@ -167,9 +167,12 @@ class EventsListingCal(webapp.RequestHandler):
             cal.add_component(e)
 
         self.response.out.write(cal.as_string())
-        if not memcache.add("ksc-calendar", cal.as_string(), 60*5):
-            logging.warn("Failed to add data to Memcache.")
-
+        for retry in range(3):
+            if not memcache.add("ksc-calendar", cal.as_string(), 60*5):
+                logging.warn("Failed to add data to Memcache.")
+                time.sleep(0.5)
+            else:
+                break
 
         
 
@@ -177,16 +180,6 @@ application = webapp.WSGIApplication(
         [
             ('/ksc-launches.ics', EventsListingCal),
             ('/', EventsListingCal),
-            ('/0', EventsListingCal),
-            ('/1', EventsListingCal),
-            ('/2', EventsListingCal),
-            ('/3', EventsListingCal),
-            ('/4', EventsListingCal),
-            ('/5', EventsListingCal),
-            ('/6', EventsListingCal),
-            ('/7', EventsListingCal),
-            ('/8', EventsListingCal),
-            ('/9', EventsListingCal),
             ('/statistics', Statistics),
             ('/about', About)
         ], debug=True)
