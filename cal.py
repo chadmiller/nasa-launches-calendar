@@ -48,7 +48,13 @@ def interpret_date(data):
         raise ValueError("no data")
 
     if "Launch Time" in data:
+        if "/" in data["Launch Time"]:
+            data["Launch Time"] = data["Launch Time"].split("/")[1]
+        if data["Launch Time"].endswith("+"):
+            data["Launch Time"] = data["Launch Time"][:-1]
+
         timezone = data["Launch Time"].split()[-1]
+
         if timezone == "EDT":
             pass
         elif timezone == "EST":
@@ -60,7 +66,13 @@ def interpret_date(data):
         try:
             d = datetime.strptime(time, "%I:%M %p %b %d %Y")
         except ValueError:
-            d = datetime.strptime(time, "%I:%M %p %B %d %Y")
+            try:
+                d = datetime.strptime(time, "%I:%M %p %B %d %Y")
+            except ValueError:
+                try:
+                    d = datetime.strptime(time, "%I:%M:%S %p %b %d %Y")
+                except ValueError:
+                    d = datetime.strptime(time, "%I:%M:%S %p %B %d %Y")
 
     else:
         time = "%s %04d" % (data["Date"].strip(" +*").replace(".", "").replace("Sept", "Sep"), data["year"])
@@ -92,7 +104,7 @@ def data_to_event(data):
 
     event = Event()
     event.add('summary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
-    event.add('description', data.get(description_key))
+    event.add('description', data.get(description_key) + " //  last verified " + datetime.now().isoformat()[:-10])
     event.add('dtstamp', datetime.now())  # todo: make this the modtime of page
     if type(d) == datetime:
         event.add('dtstart', d)
