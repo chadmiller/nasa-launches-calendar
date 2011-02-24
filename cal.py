@@ -129,6 +129,9 @@ class EventsListingCal(webapp.RequestHandler):
         cal.add('X-WR-CALDESC', "NASA publishes a web page of scheduled launches, but an iCalendar/RFC5545 feed would be so much better and useful.  So, ( http://web.chad.org/ ) Chad made one.  Enjoy!")
         cal.add('X-WR-TIMEZONE', 'US/Eastern')
         nasa_html = urllib.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
+
+        nasa_html = nasa_html.replace("""document.write('<!--[if gte IE 7]><style>.rating{margin-right:15px;}</style><![endif]-->');""", "")
+
         doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
 
         year = None
