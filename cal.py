@@ -100,7 +100,11 @@ def data_to_event(data):
 
     assert isinstance(d, datetime) or isinstance(d, date), d
 
-    description_key = [dk for dk in data.keys() if dk.endswith("Description")][0]
+    try:
+        description_key = [dk for dk in data.keys() if dk.endswith("Description")][0]
+    except IndexError, e:
+        logging.exception("data has no description: %s", data)
+        return None
 
     event = Event()
     event.add('summary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
