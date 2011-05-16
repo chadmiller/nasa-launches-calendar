@@ -7,6 +7,7 @@ from icalendar import Event, Calendar
 
 import urllib
 import logging
+import re
 try:
     from django.utils import simplejson as json
 except ImportError:
@@ -63,6 +64,7 @@ def interpret_date(data):
             raise ValueError("tz is " + repr(timezone))
 
         time = "%s %s %04d" % (" ".join(data["Launch Time"].replace(".", "").upper().split()[:-1]), data["Date"].strip(" +*").replace(".", "").replace("Sept", "Sep"), data["year"])
+        time = re.sub(r" - [0-9:]+", " ", time)
         try:
             d = datetime.strptime(time, "%I:%M %p %b %d %Y")
         except ValueError:
@@ -82,8 +84,7 @@ def interpret_date(data):
             try:
                 d = datetime.strptime(time, "%B %d %Y").date()
             except ValueError, e:
-                self.response.out.write(str(e))
-                return
+                raise
         
     return d
 
@@ -101,13 +102,16 @@ def data_to_event(data):
     assert isinstance(d, datetime) or isinstance(d, date), d
 
     try:
+        description_key = ""
         description_key = [dk for dk in data.keys() if dk.endswith("Description")][0]
     except IndexError, e:
-        logging.exception("data has no description: %s", data)
-        return None
+        logging.info("data has no description, so will try for mission: %s", data)
+
+    if not description_key:
+        description_key = [dk for dk in data.keys() if dk.endswith("Mission")][0]
 
     event = Event()
-    event.add('summary', "%s launch from %s" % (data.get("Mission", "(?)"), data.get("Launch Site", "")))
+    event.add('summary', "%s launch from %s" % (data.get("Mission", "unlisted"), data.get("Launch Site", "unlisted site")))
     event.add('description', data.get(description_key) + " //  last verified " + datetime.now().isoformat()[:-10])
     event.add('dtstamp', datetime.now())  # todo: make this the modtime of page
     if type(d) == datetime:
