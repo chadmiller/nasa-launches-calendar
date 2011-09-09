@@ -5,7 +5,7 @@ from google.appengine.api import memcache
 
 from icalendar import Event, Calendar
 
-import urllib
+import urllib2
 import logging
 import re
 try:
@@ -148,19 +148,24 @@ class EventsListingCal(webapp.RequestHandler):
         cal.add('X-WR-CALNAME', 'KSC launches by Chad')
         cal.add('X-WR-CALDESC', "NASA publishes a web page of scheduled launches, but an iCalendar/RFC5545 feed would be so much better and useful.  So, ( http://web.chad.org/ ) Chad made one.  Enjoy!")
         cal.add('X-WR-TIMEZONE', 'US/Eastern')
-        nasa_html = urllib.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
 
+
+
+
+        nasa_html = urllib2.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
         nasa_html = nasa_html.replace("""document.write('<!--[if gte IE 7]><style>.rating{margin-right:15px;}</style><![endif]-->');""", "")
-
         doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
-
         year = None
         data = { "year": year }
         for sib in doc.findAll(recursive=False)[0].findAll(recursive=False):
             if sib.name == "center":
-                year = int(sib.b.text.split(" ")[0])
-                data["year"] = year
-            elif sib.name == "b":
+                try:
+                    year = int(sib.strong.text.split(" ")[0])
+                    data["year"] = year
+                except AttributeError, e:
+                    logging.warn("sib= %s   %s", sib, e)
+                    continue
+            elif sib.name == "strong":
                 key = sib.text.strip(" :").encode("utf8")
                 value = all_strings(sib.nextSibling).strip().encode("utf8")
                 if value == "":
@@ -182,12 +187,28 @@ class EventsListingCal(webapp.RequestHandler):
                     if e:
                         cal.add_component(e)
                     data = { "year": year }
-            else:
+            elif sib.name == "hr":
                 pass
+            else:
+                logging.warn("sib name is unknown %s / %s", sib.name, sib)
         
         e = data_to_event(data)
         if e:
             cal.add_component(e)
+
+
+#
+#
+#
+#        pafb = urllib.urlopen("http://www.patrick.af.mil/index.asp").read()
+#        doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
+#        year = None
+#        data = { "year": year }
+#        for sib in doc.findAll(recursive=False)[0].findAll(recursive=False):
+#
+
+
+
 
         self.response.out.write(cal.as_string())
         for retry in range(3):
