@@ -8,11 +8,7 @@ from icalendar import Event, Calendar
 import urllib2
 import logging
 import re
-try:
-    from django.utils import simplejson as json
-except ImportError:
-    logging.exception("no django utils simplejson")
-    import json
+import json
 
 from datetime import date, datetime, timedelta
 import time
@@ -128,10 +124,6 @@ def data_to_event(data):
     
 
 class EventsListingCal(webapp.RequestHandler):
-
-    def __init__(self):
-        super(EventsListingCal, self).__init__()
-
 
     def get(self):
         self.response.headers['Content-Type'] = 'text/calendar'
