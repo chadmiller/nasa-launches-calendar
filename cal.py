@@ -218,9 +218,8 @@ class EventsListingCal(webapp.RequestHandler):
             else:
                 break
 
-        
 
-application = webapp.WSGIApplication(
+app = webapp.WSGIApplication(
         [
             ('/ksc-launches.ics', EventsListingCal),
             ('/', EventsListingCal),
@@ -228,8 +227,3 @@ application = webapp.WSGIApplication(
             ('/about', About)
         ], debug=True)
 
-def main():
-    run_wsgi_app(application)
-
-if __name__ == "__main__":
-    main()
