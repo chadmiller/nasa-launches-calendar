@@ -40,50 +40,6 @@ def all_strings(e, n=0):
             combined.append(all_strings(sub, n+1))
         return "".join(combined)
 
-def interpret_date(data):
-    if data.get("year") is None:
-        raise ValueError("no data")
-
-    if "Launch Time" in data:
-        if "/" in data["Launch Time"]:
-            data["Launch Time"] = data["Launch Time"].split("/")[1]
-        if data["Launch Time"].endswith("+"):
-            data["Launch Time"] = data["Launch Time"][:-1]
-
-        timezone = data["Launch Time"].split()[-1]
-
-        if timezone == "EDT":
-            pass
-        elif timezone == "EST":
-            pass
-        else:
-            raise ValueError("tz is " + repr(timezone))
-
-        time = "%s %s %04d" % (" ".join(data["Launch Time"].replace(".", "").upper().split()[:-1]), data["Date"].strip(" +*").replace(".", "").replace("Sept", "Sep"), data["year"])
-        time = re.sub(r" - [0-9:]+", " ", time)
-        try:
-            d = datetime.strptime(time, "%I:%M %p %b %d %Y")
-        except ValueError:
-            try:
-                d = datetime.strptime(time, "%I:%M %p %B %d %Y")
-            except ValueError:
-                try:
-                    d = datetime.strptime(time, "%I:%M:%S %p %b %d %Y")
-                except ValueError:
-                    d = datetime.strptime(time, "%I:%M:%S %p %B %d %Y")
-
-    else:
-        time = "%s %04d" % (data["Date"].strip(" +*").replace(".", "").replace("Sept", "Sep"), data["year"])
-        try:
-            d = datetime.strptime(time, "%b %d %Y").date()
-        except ValueError:
-            try:
-                d = datetime.strptime(time, "%B %d %Y").date()
-            except ValueError, e:
-                raise
-        
-    return d
-
 def data_to_event(data):
     if "Date" not in data:
         logging.info("no date in %r" % (data,))
@@ -138,67 +94,41 @@ class EventsListingCal(webapp.RequestHandler):
         cal.add('prodid', '-//Kennedy Space Center launches by Chad//NONSCML//EN')
         cal.add('X-WR-CALID', '8293bcab-1b27-44dd-8a3c-2bb045888629')
         cal.add('X-WR-CALNAME', 'KSC launches by Chad')
-        cal.add('X-WR-CALDESC', "NASA publishes a web page of scheduled launches, but an iCalendar/RFC5545 feed would be so much better and useful.  So, ( http://web.chad.org/ ) Chad made one.  Enjoy!")
+        cal.add('X-WR-CALDESC', "NASA publishes a web page of scheduled launches, but an iCalendar/RFC5545 feed would be so much better and useful.  So, ( https://chad.org/ ) Chad made one.  Enjoy!")
         cal.add('X-WR-TIMEZONE', 'US/Eastern')
 
+        launch_calendar_id = 6089
+        two_months_ago = datetime.utcnow() + timedelta(days=-60)
+        one_year_from_now = datetime.utcnow() + timedelta(days=365)
 
+        index_json = urllib2.urlopen("https://www.nasa.gov/api/1/query/calendar.json?timeRange={0}--{1}&calendars={2}".format(two_months_ago.strftime("%Y%m%d0000"), one_year_from_now.strftime("%Y%m%d0000"), launch_calendar_id))
+        index = json.load(index_json)
 
+        for index_event in index["calendarEvents"]:
+            assert index_event["type"] == "calendar_event"
+            ev_url = "https://www.nasa.gov/api/1/query/node/{0}.json?{1}".format(index_event["nid"], index_event["urlQuery"])
+            event_json = urllib2.urlopen(ev_url)
+            event_info = json.load(event_json)
 
-        nasa_html = urllib2.urlopen("http://www.nasa.gov/missions/highlights/schedule.html").read()
-        nasa_html = nasa_html.replace("""document.write('<!--[if gte IE 7]><style>.rating{margin-right:15px;}</style><![endif]-->');""", "")
-        doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
-        year = None
-        data = { "year": year }
-        for sib in doc.findAll(recursive=False)[0].findAll(recursive=False):
-            if sib.name == "center":
-                try:
-                    year = int(sib.strong.text.split(" ")[0])
-                    data["year"] = year
-                except AttributeError, e:
-                    logging.warn("sib= %s   %s", sib, e)
-                    continue
-            elif sib.name == "strong":
-                key = sib.text.strip(" :").encode("utf8")
-                value = all_strings(sib.nextSibling).strip().encode("utf8")
-                if value == "":
-                    value = all_strings(sib.nextSibling.nextSibling).strip().encode("utf8")
-                    if value.endswith("-"):
-                        value += " "
-                        value += all_strings(sib.nextSibling.nextSibling.nextSibling).strip().encode("utf8")
+            if "eventDate" in event_info["calendarEvent"]:
+                for i, event_occurance in enumerate(event_info["calendarEvent"]["eventDate"]):
+                    event = Event()
 
-# Legend: + Targeted For | * No Earlier Than (Tentative) | ** To Be Determined 
-                if key == "Date" and "**" in value:
-                    logging.info("Date is TBD  %r" % (value,))
-                    continue
-                    
-                data[key] = value
-            elif sib.name == "br":
-                if not isinstance(sib.nextSibling, NavigableString) and sib.nextSibling.name == "br":
+                    event.add('uid', event_info["calendarEvent"]["uuid"] + "_" + str(i))
+                    event.add('summary', event_info["calendarEvent"]["title"])
+                    event.add('description', event_info["calendarEvent"]["description"])
+                    event.add('dtstamp', datetime.fromtimestamp(int(event_info["calendarEvent"]["changed"])))
 
-                    e = data_to_event(data)
-                    if e:
-                        cal.add_component(e)
-                    data = { "year": year }
-            elif sib.name == "hr":
-                pass
-            else:
-                logging.warn("sib name is unknown %s / %s", sib.name, sib)
-        
-        e = data_to_event(data)
-        if e:
-            cal.add_component(e)
+                    date_start = datetime.strptime(event_occurance["value"][:-5], "%Y-%m-%dT%H:%M:%S-")
+                    date_end = datetime.strptime(event_occurance["value2"][:-5], "%Y-%m-%dT%H:%M:%S-")
+                    if event_occurance["date_type"] == "date":
+                        event.add("dtstart;value=date", icalendar.vDate(date_start).ical())
+                        event.add("dtend;value=date", icalendar.vDate(date_end).ical())
+                    else:
+                        event.add("dtstart", date_start)
+                        event.add("dtend", date_end)
 
-
-#
-#
-#
-#        pafb = urllib.urlopen("http://www.patrick.af.mil/index.asp").read()
-#        doc = BeautifulSoup(nasa_html).find("div", {"class": "white_article_wrap_detail text_adjust_me"})
-#        year = None
-#        data = { "year": year }
-#        for sib in doc.findAll(recursive=False)[0].findAll(recursive=False):
-#
-
+                    cal.add_component(event)
 
 
 
